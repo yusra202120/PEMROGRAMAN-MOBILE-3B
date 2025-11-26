@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.10.0-287.0.dev # Ganti ke versi stabil (misal: '>=3.0.0 <4.0.0')
+  sdk: '>=3.0.0 <4.0.0' # SINTAKS YANG BENAR UNTUK RENTANG VERSI
 
 dependencies:
   flutter:
@@ -24,6 +24,12 @@ dependencies:
   http: ^1.1.0 # Diperlukan untuk RESTful API
   shared_preferences: ^2.2.2 # Diperlukan untuk menyimpan data lokal
   intl: ^0.18.1 # Versi terbaru saat ini
+  
+  # ==================================
+  # DEPENDENCY BARU
+  # ==================================
+  path_provider: ^2.1.1 # Ditambahkan untuk mendapatkan jalur sistem file
+  path: ^1.8.3 # Ditambahkan untuk manipulasi path
 
 dev_dependencies:
   flutter_test:
@@ -45,8 +51,8 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   # assets:
-  #   - images/a_dot_burr.jpeg
-  #   - images/a_dot_ham.jpeg
+  #   - images/a_dot_burr.jpeg
+  #   - images/a_dot_ham.jpeg
   
   # To add custom fonts to your application, add a fonts section here,
   # in this "flutter" section. Each entry in this list should have a
