@@ -1,11 +1,11 @@
 import 'dart:convert';
-import 'dart:io'; // Digunakan untuk Directory dan File
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
 // ===================================
-// SERVICE: FileService - operasi dasar baca/tulis JSON
+// SERVICE: FileService - util dasar untuk file handling
 // ===================================
 
 class FileService {
@@ -14,21 +14,14 @@ class FileService {
     return await getApplicationDocumentsDirectory();
   }
 
-  // Cek apakah file ada
-  Future<bool> fileExists(String fileName) async {
-    final Directory dir = await documentsDirectory;
-    final File file = File(path.join(dir.path, fileName));
-    return file.exists();
-  }
-  
-  // Simpan data ke file (String)
+  // Menulis konten string ke file
   Future<File> writeFile(String fileName, String content) async {
     final Directory dir = await documentsDirectory;
     final File file = File(path.join(dir.path, fileName));
     return file.writeAsString(content);
   }
 
-  // Baca data dari file (String)
+  // Membaca konten string dari file
   Future<String> readFile(String fileName) async {
     try {
       final Directory dir = await documentsDirectory;
@@ -39,71 +32,124 @@ class FileService {
     }
   }
 
-  // Simpan object sebagai JSON
-  Future<void> writeJson(String fileName, Map<String, dynamic> json) async {
-    final String content = jsonEncode(json);
-    await writeFile(fileName, content);
+  // Mengecek apakah file ada
+  Future<bool> fileExists(String fileName) async {
+    final Directory dir = await documentsDirectory;
+    final File file = File(path.join(dir.path, fileName));
+    return file.exists();
   }
 
-  // Baca JSON dari file
-  Future<Map<String, dynamic>?> readJson(String fileName) async {
-    try {
-      final bool exists = await fileExists(fileName);
-      if (!exists) return null;
-
-      final String content = await readFile(fileName);
-      if (content.isEmpty) return null;
-
-      final Map<String, dynamic> data = jsonDecode(content);
-      return data.isNotEmpty ? data : null;
-    } catch (e) {
-      // print('Error reading JSON: $e');
-      return null;
+  // Menghapus file berdasarkan nama file
+  Future<void> deleteFile(String fileName) async {
+    final Directory dir = await documentsDirectory;
+    final File file = File(path.join(dir.path, fileName));
+    if (await file.exists()) {
+      await file.delete();
     }
   }
 
-  // Hapus file
-  Future<void> deleteFile(String fileName) async {
-    try {
-      final Directory dir = await documentsDirectory;
-      final File file = File(path.join(dir.path, fileName));
-      if (await file.exists()) {
-        await file.delete();
-      }
-    } catch (e) {
-      // print('Error deleting file: $e');
+  // Menghapus file berdasarkan path absolut (digunakan oleh NoteService)
+  Future<void> deleteNoteByPath(String filePath) async {
+    final File file = File(filePath);
+    if (await file.exists()) {
+      await file.delete();
     }
   }
 }
 
 // ===================================
-// SERVICE: UserDataService - untuk menyimpan dan membaca user data
+// SERVICE: DirectoryService - util directory management
 // ===================================
 
-class UserDataService {
+class DirectoryService {
   final FileService _fileService = FileService();
-  final String _fileName = 'user_data.json';
 
-  Future<void> saveUserData({
-    required String name,
-    required String email,
-    required int? age,
+  // Membuat direktori baru jika belum ada
+  Future<Directory> createDirectory(String dirName) async {
+    final Directory appDir = await _fileService.documentsDirectory;
+    final Directory newDir = Directory(path.join(appDir.path, dirName));
+    if (!await newDir.exists()) {
+      await newDir.create(recursive: true);
+    }
+    return newDir;
+  }
+
+  // Mendapatkan daftar file dalam direktori
+  Future<List<FileSystemEntity>> listFiles(String dirName) async {
+    final Directory dir = await createDirectory(dirName);
+    return dir.list().toList();
+  }
+
+  // Menghapus direktori beserta isinya
+  Future<void> deleteDirectory(String dirName) async {
+    final Directory appDir = await _fileService.documentsDirectory;
+    final Directory dir = Directory(path.join(appDir.path, dirName));
+    if (await dir.exists()) {
+      await dir.delete(recursive: true);
+    }
+  }
+}
+
+// ===================================
+// SERVICE: NoteService - simpan setiap note di file JSON
+// ===================================
+
+class NoteService {
+  final DirectoryService _dirService = DirectoryService();
+  final FileService _fileService = FileService();
+  final String _notesDir = 'notes'; // Nama folder untuk menyimpan notes
+
+  Future<void> saveNote({
+    required String title,
+    required String content,
   }) async {
-    final Map<String, dynamic> userData = {
-      'name': name,
-      'email': email,
-      'age': age ?? 0, // Jika age null, gunakan 0
-      'last_update': DateTime.now().toIso8601String(),
+    // 1. Buat direktori 'notes' jika belum ada
+    final Directory notesDir = await _dirService.createDirectory(_notesDir);
+
+    // 2. Buat nama file unik (timestamp in milliseconds)
+    final String fileName = '${DateTime.now().millisecondsSinceEpoch}.json';
+    final File file = File(path.join(notesDir.path, fileName));
+
+    // 3. Buat data note dalam bentuk Map
+    final Map<String, dynamic> noteData = {
+      'title': title,
+      'content': content,
+      'created_at': DateTime.now().toIso8601String(),
     };
-    await _fileService.writeJson(_fileName, userData);
+
+    // 4. Tulis data ke file JSON
+    await file.writeAsString(jsonEncode(noteData));
   }
 
-  Future<Map<String, dynamic>?> readUserData() async {
-    return await _fileService.readJson(_fileName);
+  Future<List<Map<String, dynamic>>> getAllNotes() async {
+    final Directory notesDir = await _dirService.createDirectory(_notesDir);
+    final List<FileSystemEntity> files = await notesDir.list().toList();
+
+    List<Map<String, dynamic>> notes = [];
+    for (var entity in files) {
+      if (entity is File && entity.path.endsWith('.json')) {
+        // 1. Baca konten file
+        final String content = await (entity as File).readAsString();
+        
+        // 2. Decode JSON
+        Map<String, dynamic> data = jsonDecode(content);
+        
+        // 3. Tambahkan path file untuk keperluan delete/detail
+        data['file_path'] = entity.path;
+        
+        notes.add(data);
+      }
+    }
+
+    // Urutkan dari terbaru (berdasarkan created_at)
+    notes.sort((a, b) => b['created_at'].toString().compareTo(a['created_at'].toString()));
+    
+    return notes;
   }
 
-  Future<void> deleteUserData() async {
-    await _fileService.deleteFile(_fileName);
+  // Menghapus note berdasarkan path file absolut
+  Future<void> deleteNoteByPath(String filePath) async {
+    await _fileService.deleteNoteByPath(filePath);
   }
 }
 
@@ -112,189 +158,205 @@ class UserDataService {
 // ===================================
 
 void main() {
-  runApp(const MyApp());
+  runApp(const NotesApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class NotesApp extends StatelessWidget {
+  const NotesApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'User Data JSON Demo',
-      theme: ThemeData(primarySwatch: Colors.teal),
-      home: const UserProfilePage(),
-    );
+      title: 'Flutter Notes (Local File)',
+      theme: ThemeData(primarySwatch: Colors.indigo),
+      home: const NotesPage(),
+    ); // MaterialApp
   }
 }
 
 // ===================================
-// UI: UserProfilePage
+// UI: NotesPage (Menampilkan daftar notes)
 // ===================================
 
-class UserProfilePage extends StatefulWidget {
-  const UserProfilePage({super.key});
+class NotesPage extends StatefulWidget {
+  const NotesPage({super.key});
 
   @override
-  UserProfilePageState createState() =>  UserProfilePageState();
+  State<NotesPage> createState() => _NotesPageState();
 }
 
-class UserProfilePageState extends State<UserProfilePage> {
-  final UserDataService _userService = UserDataService();
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _emailController = TextEditingController();
-  final TextEditingController _ageController = TextEditingController();
-
-  Map<String, dynamic>? _savedData;
+class _NotesPageState extends State<NotesPage> {
+  final NoteService _noteService = NoteService();
+  List<Map<String, dynamic>> _notes = [];
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadNotes();
   }
 
-  // Memuat data user dari file JSON
-  Future<void> _loadUserData() async {
-    final data = await _userService.readUserData();
-    setState(() {
-      _savedData = data;
-      // Opsional: Isi form dengan data yang dimuat jika ada
-      // if (data != null) {
-      //   _nameController.text = data['name'] ?? '';
-      //   _emailController.text = data['email'] ?? '';
-      //   _ageController.text = data['age']?.toString() ?? '';
-      // }
-    });
+  Future<void> _loadNotes() async {
+    final notes = await _noteService.getAllNotes();
+    setState(() => _notes = notes);
   }
 
-  // Simpan data ke file JSON
-  Future<void> _saveUserData() async {
-    await _userService.saveUserData(
-      name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
-      // Gunakan int.tryParse() untuk mendapatkan int? atau null
-      age: int.tryParse(_ageController.text),
+  // Navigasi ke AddNotePage dan muat ulang notes jika berhasil
+  Future<void> _addNote() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddNotePage()),
     );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Data berhasil disimpan')),
-      );
-    }
-    await _loadUserData();
-  }
-
-  // Hapus file JSON
-  Future<void> _deleteUserData() async {
-    await _userService.deleteUserData();
-    setState(() {
-      _savedData = null;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('🗑️ Data user dihapus')),
-      );
+    // Jika result == true (catatan berhasil disimpan), muat ulang daftar notes
+    if (result == true) {
+      _loadNotes();
     }
   }
 
-  // Widget helper untuk menampilkan 1 baris data
-  Widget _buildDataRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
+  // Menghapus note dan memuat ulang daftar
+  Future<void> _deleteNote(String filePath) async {
+    await _noteService.deleteNoteByPath(filePath);
+    _loadNotes();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Profil User (File JSON)')),
-      body: SingleChildScrollView(
+      appBar: AppBar(title: const Text('My Notes')),
+      body: _notes.isEmpty
+          ? const Center(child: Text('Belum ada catatan.'))
+          : ListView.builder(
+              itemCount: _notes.length,
+              itemBuilder: (context, index) {
+                final note = _notes[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  child: ListTile(
+                    title: Text(note['title'] ?? 'No Title'),
+                    subtitle: Text(
+                      note['content'] ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    // Tombol Hapus
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete, color: Colors.red),
+                      onPressed: () => _deleteNote(note['file_path']),
+                    ),
+                    // Navigasi ke Detail
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => NoteDetailPage(note: note),
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addNote,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
+}
+
+// ===================================
+// UI: AddNotePage – form untuk menulis note baru
+// ===================================
+
+class AddNotePage extends StatefulWidget {
+  const AddNotePage({super.key});
+
+  @override
+  State<AddNotePage> createState() => _AddNotePageState();
+}
+
+class _AddNotePageState extends State<AddNotePage> {
+  final NoteService _noteService = NoteService();
+  final TextEditingController _titleController = TextEditingController();
+  final TextEditingController _contentController = TextEditingController();
+
+  Future<void> _saveNote() async {
+    if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Isi semua field dulu!')),
+        );
+      }
+      return;
+    }
+
+    await _noteService.saveNote(
+      title: _titleController.text,
+      content: _contentController.text,
+    );
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Catatan disimpan!')),
+      );
+      // Kembali ke NotesPage dengan hasil true (berhasil simpan)
+      Navigator.pop(context, true); 
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Catatan Baru')),
+      body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
-            // FORM INPUT
+            // Judul
             TextField(
-              controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Nama',
-                border: OutlineInputBorder(),
-              ),
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Judul'),
             ),
             const SizedBox(height: 10),
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                border: OutlineInputBorder(),
+            // Isi Catatan (Expanded agar mengisi sisa ruang)
+            Expanded(
+              child: TextField(
+                controller: _contentController,
+                decoration: const InputDecoration(labelText: 'Isi Catatan'),
+                expands: true,
+                maxLines: null, // Penting agar bisa multiple lines
+                textAlignVertical: TextAlignVertical.top,
               ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _ageController,
-              decoration: const InputDecoration(
-                labelText: 'Usia',
-                border: OutlineInputBorder(),
-              ),
-              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
-
-            // BUTTONS
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.save),
-                  label: const Text('Simpan'),
-                  onPressed: _saveUserData,
-                ),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.delete),
-                  label: const Text('Hapus'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                  ),
-                  onPressed: _deleteUserData,
-                ),
-              ],
+            // Tombol Simpan
+            ElevatedButton.icon(
+              icon: const Icon(Icons.save),
+              label: const Text('Simpan'),
+              onPressed: _saveNote,
             ),
-            const SizedBox(height: 30),
-            const Divider(),
-
-            // TAMPILAN DATA YANG DISIMPAN
-            _savedData == null
-                ? const Text(
-                    'Belum ada data tersimpan.',
-                    style: TextStyle(color: Colors.grey),
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Data Tersimpan:',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.teal,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      // Pengambilan data dari _savedData
-                      _buildDataRow('Nama', _savedData!['name'] ?? '-'),
-                      _buildDataRow('Email', _savedData!['email'] ?? '-'),
-                      _buildDataRow('Usia', _savedData!['age']?.toString() ?? '-'),
-                      _buildDataRow('Update Terakhir', _savedData!['last_update'] ?? '-'),
-                    ],
-                  ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ===================================
+// UI: NoteDetailPage – menampilkan isi note
+// ===================================
+
+class NoteDetailPage extends StatelessWidget {
+  final Map<String, dynamic> note;
+
+  const NoteDetailPage({required this.note, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(note['title'] ?? 'Note')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Text(note['content'] ?? ''),
       ),
     );
   }
