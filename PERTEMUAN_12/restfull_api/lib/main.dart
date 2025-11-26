@@ -8,8 +8,8 @@ import 'package:http/http.dart' as http; // Import untuk koneksi HTTP
 
 class ApiConfig {
   // Ganti baseURL ini sesuai dengan instance WireMock Cloud Anda
-  // Contoh dari sesi sebelumnya: 'https://izvymq.wiremockapi.cloud'
-  static const String baseURL = 'https://laffandi.wiremockapi.cloud';
+  // URL telah disesuaikan dengan instance "izvymq" dari sesi sebelumnya.
+  static const String baseURL = 'https://izvymq.wiremockapi.cloud'; 
   static const String usersEndpoint = '/users';
 
   static Map<String, String> headers = {
@@ -83,6 +83,7 @@ class _UserPageState extends State<UserPage> {
 
       if (response.statusCode == 200) {
         // Decode JSON array
+        // Pastikan respons dari WireMock adalah List (array)
         final List<dynamic> data = jsonDecode(response.body);
         setState(() => users = data);
       } else {
@@ -118,9 +119,9 @@ class _UserPageState extends State<UserPage> {
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200 || response.statusCode == 201) {
+        // Asumsi respons POST adalah Map (object JSON)
         final Map<String, dynamic> result = jsonDecode(response.body);
         setState(() {
-          // Ambil pesan dari respons, atau gunakan pesan default
           postMessage = result['message'] ?? 'User berhasil ditambahkan!'; 
         });
 
@@ -225,8 +226,9 @@ class _UserPageState extends State<UserPage> {
                               itemBuilder: (context, index) {
                                 final user = users[index];
                                 return ListTile(
+                                  // Pastikan 'id' ada di respons JSON WireMock
                                   leading: CircleAvatar(
-                                      child: Text('${user['id']}')),
+                                      child: Text('${user['id']}')), 
                                   title: Text(user['name'] ?? 'No Name'),
                                   subtitle: Text(user['email'] ?? 'No Email'),
                                 );
