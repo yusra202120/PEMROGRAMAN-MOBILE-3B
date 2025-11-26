@@ -1,122 +1,81 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart'; // Diperlukan jika dijalankan sebagai Flutter app, atau bisa diabaikan jika hanya menggunakan Dart
+import 'user.dart'; // Sesuaikan dengan lokasi file user.dart Anda
 
 void main() {
-  runApp(const MyApp());
-}
+  print('=== DEBUG: Check JSON Structure ===');
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  // ------------------------------------------------
+  // 1. Object Dart ke JSON (Menggunakan toJson())
+  // ------------------------------------------------
+  User user = User(
+    id: 1,
+    name: 'John Doe',
+    email: 'john@example.com',
+    createdAt: DateTime.now(),
+  ); // User
 
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
+  Map<String, dynamic> userJson = user.toJson();
+  
+  print('User.toJson() result: $userJson');
+  print('Field names: ${userJson.keys.toList()}'); // Menampilkan kunci-kunci Map yang dihasilkan
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  print('\n=== TEST: JSON to Object ===');
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
+  // ------------------------------------------------
+  // 2. JSON ke Object Dart (Menggunakan fromJson())
+  // ------------------------------------------------
+  // ✔ GUNAKAN FIELD NAMES YANG SAMA DENGAN toJson() RESULT
+  Map<String, dynamic> jsonData = {
+    'id': 2,
+    'name': 'Jane Doe',
+    'email': 'jane@example.com',
+    'created_at': '2024-01-01T10:00:00.000Z', // Perhatikan casing: 'created_at'
+  };
 
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
+  // Debug: Print JSON structure sebelum di-parse
+  print('JSON data to parse: $jsonData');
+  print('JSON keys: ${jsonData.keys.toList()}');
+  print('id: ${jsonData['id']} (type: ${jsonData['id'].runtimeType})');
+  print('name: ${jsonData['name']} (type: ${jsonData['name'].runtimeType})');
+  print('created_at: ${jsonData['created_at']} (type: ${jsonData['created_at'].runtimeType})');
+  print('');
 
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  // ------------------------------------------------
+  // 3. Pengujian Parsing dan Error Handling
+  // ------------------------------------------------
+  
+  // A. Konversi Data Lengkap dan Tangani Error
+  try {
+    print('Testing fromJson with complete data...');
+    User userFromJson = User.fromJson(jsonData); 
+    print('✅ SUCCESS: User from JSON: $userFromJson'); // Memanggil method toString()
+  } catch (e, stack) {
+    print('❌ ERROR: $e');
+    print('Stack trace: $stack');
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ),
-    );
+  print('\n=== TEST: Handle Missing Fields (Nullable fields should pass) ===');
+
+  // B. Test dengan missing fields
+  Map<String, dynamic> incompleteJson = {
+    'id': 3,
+    // 'name': missing
+    'email': 'test@example.com',
+    // 'created_at': missing
+  };
+
+  try {
+    // Karena semua field di User sekarang nullable (final int? id, dll),
+    // ini seharusnya TIDAK melempar error, melainkan mengisi field yang hilang dengan null.
+    User userFromIncomplete = User.fromJson(incompleteJson);
+    print('User from incomplete JSON: $userFromIncomplete');
+    
+    // Uji validasi yang kita buat:
+    // User dianggap TIDAK valid karena 'name' adalah null/kosong
+    print('Is userFromIncomplete valid? ${userFromIncomplete.isValid ? 'YES' : 'NO'}'); 
+
+  } catch (e) {
+    // Blok catch ini hanya akan dieksekusi jika terjadi error parsing fatal
+    print('Error with incomplete JSON: $e');
   }
-}
+} 
