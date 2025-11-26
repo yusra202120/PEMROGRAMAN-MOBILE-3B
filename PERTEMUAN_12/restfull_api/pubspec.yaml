@@ -23,6 +23,7 @@ dependencies:
   # ==================================
   http: ^1.1.0 # Diperlukan untuk RESTful API
   shared_preferences: ^2.2.2 # Diperlukan untuk menyimpan data lokal
+  intl: ^0.18.1 # Versi terbaru saat ini
 
 dev_dependencies:
   flutter_test:
